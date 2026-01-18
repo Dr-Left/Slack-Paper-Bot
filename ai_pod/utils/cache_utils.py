@@ -8,7 +8,7 @@ from dataclasses import asdict
 
 from loguru import logger
 
-from ai_pod.models import Paper, ArxivCategory, OutputMode
+from ai_pod.models import Author, Paper, ArxivCategory, OutputMode
 
 
 CACHE_DIR = Path(__file__).parent.parent.parent / "data"
@@ -37,11 +37,21 @@ def paper_to_dict(paper: Paper) -> dict:
 
 def dict_to_paper(d: dict) -> Paper:
     """Convert dict back to Paper object."""
+    # Convert authors - handle both old format (list of strings) and new format (list of dicts)
+    authors = []
+    for author in d["authors"]:
+        if isinstance(author, str):
+            # Old format: just a name string
+            authors.append(Author(name=author))
+        else:
+            # New format: dict with name and affiliation
+            authors.append(Author(name=author["name"], affiliation=author.get("affiliation")))
+
     return Paper(
         arxiv_id=d["arxiv_id"],
         title=d["title"],
         abstract=d.get("abstract"),
-        authors=d["authors"],
+        authors=authors,
         published=datetime.fromisoformat(d["published"]),
         updated=datetime.fromisoformat(d["updated"]),
         categories=d["categories"],

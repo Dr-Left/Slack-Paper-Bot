@@ -155,3 +155,6 @@ Thumbs.db
 # Project cache
 data/
 
+profiles/*
+!profiles/example_profile.json
+

@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 
 from loguru import logger
 
-from ai_pod.models import ArxivCategory, OutputMode, Paper
+from ai_pod.models import ArxivCategory, Author, OutputMode, Paper
 from ai_pod.utils.cache_utils import (
     get_cache_key,
     load_cache,
@@ -46,12 +46,17 @@ def _parse_arxiv_response(xml_content: str, mode: OutputMode) -> list[Paper]:
             if summary_elem is not None and summary_elem.text:
                 abstract = summary_elem.text.strip().replace("\n", " ")
 
-        # Authors
+        # Authors with affiliations
         authors = []
         for author in entry.findall("atom:author", ATOM_NS):
             name_elem = author.find("atom:name", ATOM_NS)
             if name_elem is not None and name_elem.text:
-                authors.append(name_elem.text)
+                # Extract affiliation if available
+                affiliation_elem = author.find("arxiv:affiliation", ATOM_NS)
+                affiliation = None
+                if affiliation_elem is not None and affiliation_elem.text:
+                    affiliation = affiliation_elem.text.strip()
+                authors.append(Author(name=name_elem.text, affiliation=affiliation))
 
         # Dates
         published_elem = entry.find("atom:published", ATOM_NS)
@@ -151,6 +156,7 @@ def get_papers(
         with urllib.request.urlopen(url, timeout=30) as response:
             xml_content = response.read().decode("utf-8")
             logger.debug(f"Received response from {url}")
+            logger.debug(xml_content)
 
         batch = _parse_arxiv_response(xml_content, mode)
         if not batch:
@@ -228,6 +234,11 @@ def main():
         default=6.0,
         help="Cache TTL in hours (default: 6.0)",
     )
+    parser.add_argument(
+        "--show-affiliations",
+        action="store_true",
+        help="Show author affiliations when available",
+    )
 
     args = parser.parse_args()
 
@@ -261,6 +272,11 @@ def main():
 
     for i, paper in enumerate(papers, 1):
         print(f"{i}. {paper}")
+        if args.show_affiliations:
+            # Show authors with affiliations
+            authors_with_affil = [str(a) for a in paper.authors if a.affiliation]
+            if authors_with_affil:
+                print(f"  Affiliations: {', '.join(authors_with_affil)}")
         if mode == OutputMode.TITLE_ABSTRACT and paper.abstract:
             # Truncate abstract for display
             abstract = paper.abstract[:300] + "..." if len(paper.abstract) > 300 else paper.abstract

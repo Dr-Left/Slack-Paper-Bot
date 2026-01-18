@@ -1,0 +1,27 @@
+{
+  "name": "ml_researcher",
+  "topics": [
+    "large language models and their applications",
+    "efficient training methods for transformers",
+    "reasoning and planning in AI systems"
+  ],
+  "keywords": [
+    "attention",
+    "RLHF",
+    "LoRA",
+    "instruction tuning",
+    "chain-of-thought",
+    "in-context learning"
+  ],
+  "past_papers": [
+    {
+      "title": "Attention Is All You Need",
+      "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely."
+    },
+    {
+      "title": "Language Models are Few-Shot Learners",
+      "abstract": "Recent work has demonstrated substantial gains on many NLP tasks and benchmarks by pre-training on a large corpus of text followed by fine-tuning on a specific task. We demonstrate that scaling up language models greatly improves task-agnostic, few-shot performance, sometimes even reaching competitiveness with prior state-of-the-art fine-tuning approaches."
+    }
+  ],
+  "preferred_authors": ["Song Han"]
+}
