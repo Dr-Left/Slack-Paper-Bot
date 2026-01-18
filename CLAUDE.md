@@ -11,7 +11,7 @@ AI Coffee Time is an AI-powered tool that generates personalized podcast content
 - **Language**: Python 3.13+
 - **Environment**: Virtual environment (`.venv`)
 - **ML**: SPECTER2 (allenai/specter2_base) for paper embeddings
-- **Dependencies**: transformers, adapters, torch, numpy, loguru
+- **Dependencies**: transformers, adapters, torch, numpy, loguru, slack_sdk
 
 ## Development Commands
 
@@ -27,6 +27,12 @@ python -m ai_pod.get_papers -c cs.LG cs.AI -d 7 -n 20 --show-affiliations
 
 # Filter papers by user profile
 python -m ai_pod.filter_papers -p profiles/example_profile.json --fetch -c cs.LG -d 3 -t 0.3
+
+# Run Slack bot (dry run)
+python -m ai_pod.slack_bot --dry-run
+
+# Run Slack bot (post to Slack)
+python -m ai_pod.slack_bot
 
 # Run tests (when implemented)
 pytest
@@ -44,12 +50,18 @@ ai-pod/
 │   ├── models.py            # Data models (Paper, Author, UserProfile, etc.)
 │   ├── get_papers.py        # arXiv API paper fetching
 │   ├── filter_papers.py     # SPECTER2-based semantic filtering
+│   ├── slack_bot.py         # Slack bot for daily paper digests
 │   └── utils/
 │       ├── cache_utils.py       # Paper caching utilities
 │       └── embedding_cache.py   # Embedding caching utilities
+├── config/
+│   ├── config.example.json  # Slack bot config template
+│   └── config.json          # Actual config (gitignored)
 ├── profiles/
-│   └── example_profile.json # Example user profile
+│   ├── example_profile.json # Example user profile
+│   └── efficient_ml.json    # Efficient ML research profile
 ├── data/                    # Cache directory (auto-created)
+├── logs/                    # Log files (auto-created, gitignored)
 ├── setup.py
 ├── CLAUDE.md
 └── README.md
@@ -77,11 +89,20 @@ ai-pod/
 - `UserProfile`: researcher interests (topics, keywords, past papers)
 - `FilteredPaper`: paper with similarity score
 
+### Slack Bot (`slack_bot.py`)
+- Posts daily paper digests to Slack channel
+- Uses `filter_papers.py` for semantic matching against user profile
+- Tracks posted papers in `data/posted_papers.json` for deduplication
+- Configurable via `config/config.json` (bot token, channel, categories, etc.)
+- CLI: `python -m ai_pod.slack_bot --help`
+- Requires Slack App with `chat:write` and `chat:write.public` scopes
+
 ## Architecture Notes
 
 Key components still to be built:
 - Text-to-speech synthesis for podcast generation
 - Content summarization and script writing
+- Email digest option (alternative to Slack)
 
 ## Code Style
 
