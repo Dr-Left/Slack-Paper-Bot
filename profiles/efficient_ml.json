@@ -1,0 +1,27 @@
+{
+  "name": "efficient_ml",
+  "topics": [
+    "efficient machine learning and model compression",
+    "neural network quantization and pruning techniques",
+    "hardware-aware deep learning optimization",
+    "efficient inference for large language models"
+  ],
+  "keywords": [
+    "quantization", "INT8", "INT4", "pruning", "sparsity",
+    "LoRA", "adapters", "MoE", "mixture of experts",
+    "FlashAttention", "efficient attention",
+    "GPU optimization", "edge deployment", "latency",
+    "knowledge distillation", "model compression"
+  ],
+  "past_papers": [
+    {
+      "title": "LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale",
+      "abstract": "Large language models require significant GPU memory for inference. We develop a procedure for Int8 matrix multiplication for feed-forward and attention projection layers in transformers, which cut the memory needed for inference by half while retaining full precision performance."
+    },
+    {
+      "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+      "abstract": "We propose Low-Rank Adaptation, or LoRA, which freezes the pretrained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture, greatly reducing the number of trainable parameters for downstream tasks."
+    }
+  ],
+  "preferred_authors": []
+}

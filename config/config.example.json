@@ -1,0 +1,8 @@
+{
+  "bot_token": "xoxb-your-token-here",
+  "channel_id": "C0123456789",
+  "profile_path": "profiles/efficient_ml.json",
+  "categories": ["cs.LG", "cs.AI", "cs.CL"],
+  "days": 1,
+  "top_k": 5
+}

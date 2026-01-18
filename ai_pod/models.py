@@ -95,3 +95,4 @@ class FilteredPaper:
     def __str__(self) -> str:
         return f"[{self.similarity_score:.3f}] {self.paper}"
 
+

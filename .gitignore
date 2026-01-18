@@ -157,4 +157,11 @@ data/
 
 profiles/*
 !profiles/example_profile.json
+!profiles/efficient_ml.json
+
+# Slack bot config (contains secrets)
+config/config.json
+
+# Logs
+logs/
 
