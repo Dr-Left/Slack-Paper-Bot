@@ -88,7 +88,7 @@ crontab -e
 0 8 * * * cd /path/to/repo && .venv/bin/python -m ai_pod.slack_bot >> logs/slack_bot.log 2>&1
 ```
 
-### Other Debug Commands:**
+### Other Debug Commands:
 ```bash
 # Fetch papers from arXiv (shows affiliations when present)
 python -m ai_pod.get_papers -c cs.LG cs.AI -d 7 -n 20 --show-affiliations
