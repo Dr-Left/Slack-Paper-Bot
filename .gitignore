@@ -165,3 +165,4 @@ config/config.json
 # Logs
 logs/
 
+config/profiles/*
