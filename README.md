@@ -2,11 +2,16 @@
 
 AI-powered tool that curates personalized ML paper digests (and future podcast-style content) for researchers.
 
+### Requirements
+
+A machine with at least 16GB RAM is enough. The machine should be up to be able to send out the messages to slack.
+With Apple Sillicon MPS or CUDA GPU is better to accelerate the embedding generation and vector similarity calculation.
+
 ### Features
 
 - **Paper fetching**: Fetch recent papers from arXiv by category (with optional affiliations).
 - **Semantic filtering**: SPECTER2-based matching against a user profile (topics, keywords, past papers).
-- **Slack digests**: Daily top papers posted to a Slack channel, with reaction-based profile updates.
+- **Slack digests**: Daily top papers posted to a Slack channel, with **reaction-based profile updates**.
 - **LLM summary**: Optional GPT-4o-powered digest summary footer for Slack.
 
 ### Install
@@ -105,6 +110,10 @@ Caches are used automatically and refreshed as needed.
 - `ai_pod.slack_bot`: Orchestrates fetch → filter → dedupe → post, plus optional summary.
 - `ai_pod.slack_utils`: Slack formatting, posting, reaction-based profile updates, channel import.
 - `ai_pod.summary`: GPT-4o-based digest summarization using OpenAI Python SDK.
+
+## Acknoledgements
+
+Some insights came from [arXiv_recbot](https://github.com/yuandong-tian/arXiv_recbot/tree/main) and [ArxivDigest](https://github.com/AutoLLM/ArxivDigest).
 
 ## License
 MIT License.
