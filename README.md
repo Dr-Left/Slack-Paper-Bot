@@ -105,3 +105,6 @@ Caches are used automatically and refreshed as needed.
 - `ai_pod.slack_bot`: Orchestrates fetch → filter → dedupe → post, plus optional summary.
 - `ai_pod.slack_utils`: Slack formatting, posting, reaction-based profile updates, channel import.
 - `ai_pod.summary`: GPT-4o-based digest summarization using OpenAI Python SDK.
+
+## License
+MIT License.
