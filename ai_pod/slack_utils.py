@@ -113,13 +113,44 @@ def format_summary_footer_blocks(summary: str) -> list[dict]:
     Returns:
         List of Slack block elements for the footer.
     """
+    def _truncate_to_char_limit_preserving_lines(text: str, limit: int) -> str:
+        """Best-effort truncate without cutting mid-line (avoids breaking Slack link markup)."""
+        if limit <= 0:
+            return ""
+        text = (text or "").strip()
+        if len(text) <= limit:
+            return text
+        lines = text.splitlines()
+        out_lines: list[str] = []
+        remaining = limit - 4  # space for "\n..."
+        for line in lines:
+            if not line:
+                candidate = ""
+            else:
+                candidate = line
+            # +1 accounts for newline join when there are existing lines
+            extra = len(candidate) + (1 if out_lines else 0)
+            if extra > remaining:
+                break
+            out_lines.append(candidate)
+            remaining -= extra
+        truncated = "\n".join(out_lines).rstrip()
+        if not truncated:
+            return (text[: max(0, limit - 3)] + "...").rstrip()
+        return (truncated + "\n...").rstrip()
+
+    # Slack section.text has a hard limit; keep this safely below it.
+    body_text = _truncate_to_char_limit_preserving_lines(
+        f"*Today's Digest Summary*\n{(summary or '').strip()}",
+        limit=2900,
+    )
     return [
         {"type": "divider"},
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*Today's Digest Summary*\n{summary}",
+                "text": body_text,
             },
         },
     ]
