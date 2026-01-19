@@ -403,7 +403,7 @@ def load_user_profile(profile_path: str | Path) -> UserProfile:
         data = json.load(f)
 
     past_papers = [
-        PastPaper(title=p["title"], abstract=p.get("abstract"))
+        PastPaper(title=p["title"], abstract=p.get("abstract"), arxiv_id=p.get("arxiv_id"))
         for p in data.get("past_papers", [])
     ]
 
@@ -431,7 +431,8 @@ def save_user_profile(profile: UserProfile, profile_path: str | Path) -> None:
         "topics": profile.topics,
         "keywords": profile.keywords,
         "past_papers": [
-            {"title": p.title, "abstract": p.abstract} for p in profile.past_papers
+            {"title": p.title, "abstract": p.abstract, "arxiv_id": p.arxiv_id}
+            for p in profile.past_papers
         ],
         "preferred_authors": profile.preferred_authors or [],
     }

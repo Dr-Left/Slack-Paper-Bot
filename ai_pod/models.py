@@ -72,6 +72,7 @@ class PastPaper:
 
     title: str
     abstract: Optional[str] = None
+    arxiv_id: Optional[str] = None
 
 
 @dataclass

@@ -23,5 +23,5 @@
       "abstract": "We propose Low-Rank Adaptation, or LoRA, which freezes the pretrained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture, greatly reducing the number of trainable parameters for downstream tasks."
     }
   ],
-  "preferred_authors": []
+  "preferred_authors": [""]
 }
