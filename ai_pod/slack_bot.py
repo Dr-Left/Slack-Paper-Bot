@@ -3,16 +3,27 @@
 import argparse
 import json
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from loguru import logger
 
-from typing import Optional
-
-from ai_pod.filter_papers import filter_papers, load_user_profile, save_user_profile
+from ai_pod.filter_papers import filter_papers, load_user_profile
 from ai_pod.get_papers import get_papers
-from ai_pod.models import ArxivCategory, FilteredPaper, OutputMode, PastPaper
+from ai_pod.models import ArxivCategory, OutputMode
+from ai_pod.posted_papers import (
+    filter_already_posted,
+    load_posted_papers,
+    save_posted_papers,
+)
+from ai_pod.slack_utils import (
+    fetch_reactions_and_update_profile,
+    format_paper_message,
+    import_papers_from_channel,
+    post_summary_footer,
+    post_to_slack,
+)
+from ai_pod.summary import generate_paper_summary
 
 
 @dataclass
@@ -25,9 +36,7 @@ class SlackConfig:
     categories: list[str]
     days: int
     top_k: int
-
-
-POSTED_PAPERS_PATH = Path("data/posted_papers.json")
+    openai_api_key: Optional[str] = None
 
 
 def load_config(config_path: str = "config/config.json") -> SlackConfig:
@@ -65,307 +74,17 @@ def load_config(config_path: str = "config/config.json") -> SlackConfig:
         categories=data.get("categories", ["cs.LG", "cs.AI", "cs.CL"]),
         days=data.get("days", 1),
         top_k=data.get("top_k", 5),
+        openai_api_key=data.get("openai_api_key"),
     )
 
 
-def load_posted_papers() -> list[dict]:
-    """Load list of previously posted papers with metadata.
-
-    Returns:
-        List of paper dicts with arxiv_id, message_ts, title, abstract.
-        Handles backward compatibility with old format (just IDs).
-    """
-    if not POSTED_PAPERS_PATH.exists():
-        return []
-
-    with open(POSTED_PAPERS_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Handle new format
-    if "posted_papers" in data:
-        return data["posted_papers"]
-
-    # Backward compatibility: old format had "posted_ids"
-    # Convert to new format (without message_ts or metadata)
-    old_ids = data.get("posted_ids", [])
-    return [{"arxiv_id": arxiv_id} for arxiv_id in old_ids]
-
-
-def get_posted_paper_ids() -> set[str]:
-    """Get set of previously posted paper IDs.
-
-    Returns:
-        Set of arxiv_ids that have been posted.
-    """
-    papers = load_posted_papers()
-    return {p["arxiv_id"] for p in papers}
-
-
-def save_posted_papers(new_papers: list[dict]) -> None:
-    """Save newly posted papers with metadata to the tracking file.
-
-    Args:
-        new_papers: List of paper dicts with arxiv_id, message_ts, title, abstract.
-    """
-    POSTED_PAPERS_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    existing = load_posted_papers()
-    existing_ids = {p["arxiv_id"] for p in existing}
-
-    # Add new papers (avoid duplicates)
-    for paper in new_papers:
-        if paper["arxiv_id"] not in existing_ids:
-            existing.append(paper)
-            existing_ids.add(paper["arxiv_id"])
-
-    with open(POSTED_PAPERS_PATH, "w", encoding="utf-8") as f:
-        json.dump({"posted_papers": existing}, f, indent=2)
-
-    logger.info(f"Saved {len(new_papers)} new papers to posted papers tracking")
-
-
-def filter_already_posted(papers: list[FilteredPaper]) -> list[FilteredPaper]:
-    """Remove papers that have already been posted.
-
-    Args:
-        papers: List of filtered papers.
-
-    Returns:
-        Papers that haven't been posted yet.
-    """
-    posted_ids = get_posted_paper_ids()
-    filtered = [p for p in papers if p.paper.arxiv_id not in posted_ids]
-
-    if len(filtered) < len(papers):
-        logger.info(f"Filtered out {len(papers) - len(filtered)} already-posted papers")
-
-    return filtered
-
-
-def format_paper_message(paper: FilteredPaper, index: int) -> str:
-    """Format a single paper for Slack display.
-
-    Args:
-        paper: FilteredPaper object.
-        index: Paper number in the list.
-
-    Returns:
-        Formatted string for Slack.
-    """
-    p = paper.paper
-    arxiv_url = f"https://arxiv.org/abs/{p.arxiv_id}"
-
-    # Get first 2-3 authors
-    author_names = [a.name for a in p.authors[:3]]
-    authors_str = ", ".join(author_names)
-    if len(p.authors) > 3:
-        authors_str += " et al."
-
-    return f"*{index}. [{paper.similarity_score:.2f}]* <{arxiv_url}|{p.title}>\n   by {authors_str}"
-
-
-def format_header_blocks(num_papers: int) -> list[dict]:
-    """Format the daily digest header as Slack blocks.
-
-    Args:
-        num_papers: Number of papers being posted.
-
-    Returns:
-        List of Slack block elements for the header.
-    """
-    today = datetime.now().strftime("%B %d, %Y")
-
-    return [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": f"Top {num_papers} Papers for {today}",
-                "emoji": True,
-            },
-        },
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": "React with :fire: to add a paper to your profile for better recommendations!",
-                }
-            ],
-        },
-        {"type": "divider"},
-    ]
-
-
-def format_single_paper_blocks(paper: FilteredPaper, index: int) -> list[dict]:
-    """Format a single paper as Slack blocks.
-
-    Args:
-        paper: FilteredPaper object.
-        index: Paper number in the list.
-
-    Returns:
-        List of Slack block elements for the paper.
-    """
-    p = paper.paper
-    arxiv_url = f"https://arxiv.org/abs/{p.arxiv_id}"
-
-    # Get first 2-3 authors
-    author_names = [a.name for a in p.authors[:3]]
-    authors_str = ", ".join(author_names)
-    if len(p.authors) > 3:
-        authors_str += " et al."
-
-    blocks = [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*{index}. [{paper.similarity_score:.2f}]* <{arxiv_url}|{p.title}>\nby {authors_str}",
-            },
-        },
-    ]
-
-    return blocks
-
-
-def post_to_slack(
-    config: SlackConfig, papers: list[FilteredPaper]
-) -> list[tuple[str, str]]:
-    """Post papers to Slack channel, each as a separate message.
-
-    Args:
-        config: Slack configuration.
-        papers: List of papers to post.
-
-    Returns:
-        List of (arxiv_id, message_ts) tuples for successfully posted papers.
-    """
-    from slack_sdk import WebClient
-    from slack_sdk.errors import SlackApiError
-
-    client = WebClient(token=config.bot_token)
-    posted: list[tuple[str, str]] = []
-
-    # Post header message first
-    try:
-        header_blocks = format_header_blocks(len(papers))
-        client.chat_postMessage(
-            channel=config.channel_id,
-            blocks=header_blocks,
-            text=f"Top {len(papers)} ML papers for today",
-        )
-    except SlackApiError as e:
-        logger.error(f"Failed to post header: {e.response['error']}")
-        return posted
-
-    # Post each paper as a separate message
-    for i, paper in enumerate(papers, 1):
-        try:
-            blocks = format_single_paper_blocks(paper, i)
-            response = client.chat_postMessage(
-                channel=config.channel_id,
-                blocks=blocks,
-                text=f"{i}. {paper.paper.title}",  # Fallback for notifications
-            )
-            message_ts = response["ts"]
-            posted.append((paper.paper.arxiv_id, message_ts))
-            logger.debug(f"Posted paper {paper.paper.arxiv_id}: {message_ts}")
-
-        except SlackApiError as e:
-            logger.error(f"Failed to post paper {paper.paper.arxiv_id}: {e.response['error']}")
-            continue
-
-    logger.info(f"Posted {len(posted)}/{len(papers)} papers to Slack channel {config.channel_id}")
-    return posted
-
-
-def fetch_reactions_and_update_profile(
-    config: SlackConfig,
-    reaction_emoji: str = "fire",
-) -> int:
-    """Fetch reactions from posted papers and add liked papers to profile.
-
-    Args:
-        config: Slack configuration.
-        reaction_emoji: The emoji reaction to look for (default: "fire" for 🔥).
-
-    Returns:
-        Number of papers added to the profile.
-    """
-    from slack_sdk import WebClient
-    from slack_sdk.errors import SlackApiError
-
-    posted_papers = load_posted_papers()
-
-    # Filter to papers that have message_ts (can check reactions)
-    papers_with_ts = [p for p in posted_papers if p.get("message_ts")]
-
-    if not papers_with_ts:
-        logger.debug("No posted papers with message_ts to check for reactions")
-        return 0
-
-    logger.info(f"Checking reactions on {len(papers_with_ts)} posted papers...")
-
-    client = WebClient(token=config.bot_token)
-
-    # Load profile to check existing papers and add new ones
-    profile = load_user_profile(config.profile_path)
-    existing_titles = {p.title.lower() for p in profile.past_papers}
-    existing_arxiv_ids = {p.arxiv_id for p in profile.past_papers if p.arxiv_id}
-
-    papers_to_add = []
-
-    for paper in papers_with_ts:
-        arxiv_id = paper.get("arxiv_id")
-        message_ts = paper.get("message_ts")
-        title = paper.get("title")
-        abstract = paper.get("abstract")
-
-        # Skip if already in profile (by title or arxiv_id)
-        if title and title.lower() in existing_titles:
-            continue
-        if arxiv_id and arxiv_id in existing_arxiv_ids:
-            continue
-
-        # Check for reactions on this message
-        try:
-            response = client.reactions_get(
-                channel=config.channel_id,
-                timestamp=message_ts,
-            )
-
-            # Check if the target reaction exists
-            message = response.get("message", {})
-            reactions = message.get("reactions", [])
-
-            has_target_reaction = any(r.get("name") == reaction_emoji for r in reactions)
-
-            if has_target_reaction and title:
-                papers_to_add.append(
-                    PastPaper(title=title, abstract=abstract, arxiv_id=arxiv_id)
-                )
-                logger.debug(f"Found 🔥 reaction on: {title}")
-
-        except SlackApiError as e:
-            logger.warning(f"Failed to get reactions for {arxiv_id}: {e.response['error']}")
-            continue
-
-    # Add papers to profile
-    if papers_to_add:
-        profile.past_papers.extend(papers_to_add)
-        save_user_profile(profile, config.profile_path)
-        logger.info(f"Added {len(papers_to_add)} papers to profile from reactions")
-
-    return len(papers_to_add)
-
-
-def run_bot(config_path: str = "config/config.json", dry_run: bool = False) -> None:
+def run_bot(config_path: str = "config/config.json", dry_run: bool = False, allow_duplication: bool = False) -> None:
     """Run the Slack bot to fetch, filter, and post papers.
 
     Args:
         config_path: Path to configuration file.
         dry_run: If True, don't post to Slack, just show what would be posted.
+        allow_duplication: If True, allow duplication of papers in the digest.
     """
     # 1. Load config
     logger.info("Loading configuration...")
@@ -416,7 +135,8 @@ def run_bot(config_path: str = "config/config.json", dry_run: bool = False) -> N
         return
 
     # 6. Remove already posted papers
-    filtered = filter_already_posted(filtered)
+    if not allow_duplication:
+        filtered = filter_already_posted(filtered)
 
     if not filtered:
         logger.info("All matching papers have already been posted")
@@ -433,6 +153,17 @@ def run_bot(config_path: str = "config/config.json", dry_run: bool = False) -> N
         for i, paper in enumerate(papers_to_post, 1):
             print(format_paper_message(paper, i))
             print()
+
+        # Generate and display summary if API key is configured
+        if config.openai_api_key:
+            previous_papers = load_posted_papers()
+            logger.info("Generating paper summary...")
+            summary = generate_paper_summary(papers_to_post, previous_papers, config.openai_api_key)
+            if summary:
+                print("-" * 60)
+                print("TODAY'S DIGEST SUMMARY:\n")
+                print(summary)
+                print()
         print("=" * 60)
     else:
         # Post to Slack (each paper as separate message)
@@ -455,6 +186,14 @@ def run_bot(config_path: str = "config/config.json", dry_run: bool = False) -> N
             ]
             save_posted_papers(posted_papers)
             logger.info(f"Successfully posted {len(posted_results)} papers to Slack")
+
+            # 9. Generate and post summary footer if API key is configured
+            if config.openai_api_key:
+                previous_papers = load_posted_papers()
+                logger.info("Generating paper summary...")
+                summary = generate_paper_summary(papers_to_post, previous_papers, config.openai_api_key)
+                if summary:
+                    post_summary_footer(config, summary)
         else:
             logger.error("Failed to post any papers to Slack")
 
@@ -474,6 +213,15 @@ Examples:
 
   # Use custom config
   python -m ai_pod.slack_bot -c config/custom_config.json
+
+  # Import existing papers from Slack channel
+  python -m ai_pod.slack_bot --import-from-channel
+
+  # Import from a different channel
+  python -m ai_pod.slack_bot --import-from-channel --import-channel C01234ABCDE
+
+  # Import last 30 days without fetching metadata
+  python -m ai_pod.slack_bot --import-from-channel --import-days 30 --no-fetch-metadata
 """,
     )
 
@@ -489,11 +237,49 @@ Examples:
         action="store_true",
         help="Don't post to Slack, just show what would be posted",
     )
-
+    parser.add_argument(
+        "--allow-duplication",
+        action="store_true",
+        help="Allow duplication of papers in the digest",
+    )
+    parser.add_argument(
+        "--import-from-channel",
+        action="store_true",
+        help="Import existing papers from Slack channel history",
+    )
+    parser.add_argument(
+        "--import-channel",
+        type=str,
+        default=None,
+        help="Channel ID to import from (overrides config channel_id)",
+    )
+    parser.add_argument(
+        "--import-days",
+        type=int,
+        default=None,
+        help="Number of days of history to import (default: all history)",
+    )
+    parser.add_argument(
+        "--no-fetch-metadata",
+        action="store_true",
+        help="Don't fetch paper metadata from arXiv when importing",
+    )
     args = parser.parse_args()
 
     try:
-        run_bot(config_path=args.config, dry_run=args.dry_run)
+        # Import mode: scan channel and add papers to tracking
+        if args.import_from_channel:
+            config = load_config(args.config)
+            count = import_papers_from_channel(
+                config=config,
+                days=args.import_days,
+                fetch_metadata=not args.no_fetch_metadata,
+                channel_id=args.import_channel,
+            )
+            logger.info(f"Import complete: {count} papers added to tracking")
+        else:
+            # Normal mode: fetch, filter, and post papers
+            run_bot(config_path=args.config, dry_run=args.dry_run, allow_duplication=args.allow_duplication)
     except FileNotFoundError as e:
         logger.error(str(e))
         raise SystemExit(1)

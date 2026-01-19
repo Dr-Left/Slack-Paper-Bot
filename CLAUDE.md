@@ -34,6 +34,15 @@ python -m ai_pod.slack_bot --dry-run
 # Run Slack bot (post to Slack)
 python -m ai_pod.slack_bot
 
+# Import existing papers from Slack channel
+python -m ai_pod.slack_bot --import-from-channel
+
+# Import from a different channel
+python -m ai_pod.slack_bot --import-from-channel --import-channel C01234ABCDE
+
+# Import last 30 days without fetching metadata (faster)
+python -m ai_pod.slack_bot --import-from-channel --import-days 30 --no-fetch-metadata
+
 # Run tests (when implemented)
 pytest
 
@@ -50,7 +59,10 @@ ai-pod/
 │   ├── models.py            # Data models (Paper, Author, UserProfile, etc.)
 │   ├── get_papers.py        # arXiv API paper fetching
 │   ├── filter_papers.py     # SPECTER2-based semantic filtering
-│   ├── slack_bot.py         # Slack bot for daily paper digests
+│   ├── slack_bot.py         # Slack bot main entry point
+│   ├── slack_utils.py       # Slack formatting, posting, reactions, import
+│   ├── posted_papers.py     # Posted papers tracking utilities
+│   ├── summary.py           # LLM summary generation
 │   └── utils/
 │       ├── cache_utils.py       # Paper caching utilities
 │       └── embedding_cache.py   # Embedding caching utilities
@@ -61,6 +73,8 @@ ai-pod/
 │   ├── example_profile.json # Example user profile
 │   └── efficient_ml.json    # Efficient ML research profile
 ├── data/                    # Cache directory (auto-created)
+│   ├── posted_papers.json   # Tracking of posted papers with metadata
+│   └── paper_embeddings.json # Cached SPECTER2 embeddings
 ├── logs/                    # Log files (auto-created, gitignored)
 ├── setup.py
 ├── CLAUDE.md
