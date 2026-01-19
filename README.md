@@ -2,6 +2,9 @@
 
 AI-powered tool that curates personalized ML paper digests (and future podcast-style content) for researchers.
 
+### Roadmap:
+- [ ] GitHub Actions
+
 ### Requirements
 
 A machine with at least 16GB RAM is enough. The machine should be up to be able to send out the messages to slack.
@@ -17,22 +20,20 @@ With Apple Sillicon MPS or CUDA GPU is better to accelerate the embedding genera
 ### Install
 
 ```bash
-python -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install -e .
+uv pip install -e .
 ```
-
-Python 3.13+ is recommended.
 
 ### Configure Slack bot
 
 1. **Create Slack app**
    - Go to `https://api.slack.com/apps`
-   - Create a new app from scratch
-   - Add bot scopes: `chat:write`, `chat:write.public`
+   - Create a new app **from scratch**
+   - In  `OAuth & Permissions`, add bot scopes: `chat:write`, `chat:write.public`, `channels:history`, `groups:history`, `reactions:read`
    - Install the app and copy the **Bot User OAuth Token** (`xoxb-...`)
 2. **Find channel ID**
-   - Open channel details in Slack and copy the **Channel ID** (`C...`)
+   - Open channel details in Slack and copy the **Channel ID** (`C...`) (At the bottom of the Slack channel detail page, after you click on the channel title)
 3. **Create config**
 
 ```bash
@@ -53,9 +54,11 @@ Edit `config/config.json`:
 }
 ```
 
-### Profiles
+If you don't want to use LLM to summarize the papers, just remove `openai_api_key`.
 
-Profiles live in `profiles/*.json`. See `profiles/example_profile.json` or `profiles/efficient_ml.json`:
+### Paper Interest Profiles
+
+Paper Interest profiles live in `profiles/*.json`. See `profiles/example_profile.json` or `profiles/efficient_ml.json`:
 
 - **name**: Profile name.
 - **topics**: Free-text research interests.
@@ -63,10 +66,29 @@ Profiles live in `profiles/*.json`. See `profiles/example_profile.json` or `prof
 - **past_papers**: Optional list of `{title, abstract, arxiv_id}`.
 - **preferred_authors**: Optional list of author names.
 
-Papers you react to with `:fire:` in Slack are automatically added to your profile’s `past_papers`.
+Papers you react to with `:fire:` in Slack are automatically added to your profile’s `past_papers`, which will automatically tune the recommender's taste.
 
 ### Core commands
 
+```bash
+# **MAIN** Run Slack bot
+python -m ai_pod.slack_bot --dry-run  # test without Slack configuration
+python -m ai_pod.slack_bot  # full run
+
+# Import historic arXiv links from a channel into paper history to avoid duplications
+python -m ai_pod.slack_bot --import-from-channel --import-channel C01234ABCDE --import-days 30
+```
+
+### Scheduling (Daily Paper Digest)
+
+```bash
+crontab -e
+
+# Daily 8am digest
+0 8 * * * cd /path/to/repo && .venv/bin/python -m ai_pod.slack_bot >> logs/slack_bot.log 2>&1
+```
+
+### Other Debug Commands:**
 ```bash
 # Fetch papers from arXiv (shows affiliations when present)
 python -m ai_pod.get_papers -c cs.LG cs.AI -d 7 -n 20 --show-affiliations
@@ -77,22 +99,6 @@ python -m ai_pod.filter_papers -p profiles/example_profile.json --fetch -c cs.LG
 # Filter using an existing cached papers file
 python -m ai_pod.filter_papers -p profiles/example_profile.json --papers-cache data/papers_*.json
 
-# Run Slack bot
-python -m ai_pod.slack_bot --dry-run
-python -m ai_pod.slack_bot
-
-# Import historic arXiv links from a channel into tracking
-python -m ai_pod.slack_bot --import-from-channel
-python -m ai_pod.slack_bot --import-from-channel --import-channel C01234ABCDE --import-days 30 --no-fetch-metadata
-```
-
-### Scheduling (optional)
-
-```bash
-crontab -e
-
-# Daily 8am digest
-0 8 * * * cd /path/to/ai-pod && .venv/bin/python -m ai_pod.slack_bot >> logs/slack_bot.log 2>&1
 ```
 
 ### Data & caching
