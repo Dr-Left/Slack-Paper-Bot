@@ -14,6 +14,7 @@ from ai_pod.filter_papers import filter_papers, load_user_profile, save_user_pro
 from ai_pod.get_papers import get_papers
 from ai_pod.models import ArxivCategory, FilteredPaper, OutputMode, PastPaper
 
+from scholar_inbox.scholar_fetcher import fetch_scholar_inbox_data
 
 @dataclass
 class SlackConfig:
@@ -360,7 +361,22 @@ def fetch_reactions_and_update_profile(
     return len(papers_to_add)
 
 
-def run_bot(config_path: str = "config/config.json", dry_run: bool = False) -> None:
+def run_bot(
+        config_path: str = "config/config.json", 
+        dry_run: bool = False, 
+        use_scholar_inbox: bool = False
+    ) -> None:
+    if use_scholar_inbox:
+        return run_bot_scholar_inbox(config_path, dry_run)
+    else:
+        return run_bot_ai(config_path, dry_run)
+
+# TODO
+def run_bot_scholar_inbox(config_path: str = "config/config.json", dry_run: bool = False) -> None:
+    raise NotImplementedError("Scholar Inbox integration not yet implemented.")
+    
+
+def run_bot_ai(config_path: str = "config/config.json", dry_run: bool = False) -> None:
     """Run the Slack bot to fetch, filter, and post papers.
 
     Args:
