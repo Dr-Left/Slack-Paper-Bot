@@ -3,6 +3,7 @@
 from typing import Optional
 
 import numpy as np
+import re
 from loguru import logger
 
 from ai_pod.filter_papers import get_specter_model
@@ -168,11 +169,22 @@ def generate_paper_summary(
                 },
                 {"role": "user", "content": prompt},
             ],
+            # Keep this modest; we also hard-truncate during post-processing below.
             max_tokens=500,
             temperature=0.7,
         )
 
         summary = response.choices[0].message.content
+
+        def truncate_words_preserving_slack_links(text: str, max_words: int) -> str:
+            """Truncate to max_words, treating Slack link markup (<url|label>) as a single token."""
+            if max_words <= 0:
+                return ""
+            # Keep <...> intact, otherwise split on whitespace.
+            tokens = re.findall(r"<[^>\n]+>|\S+", text)
+            if len(tokens) <= max_words:
+                return text.strip()
+            return (" ".join(tokens[:max_words]).rstrip() + " ...").strip()
 
         def strip_simple_markdown(text: str) -> str:
             # Remove lightweight emphasis markers that can render oddly in Slack
@@ -207,6 +219,8 @@ def generate_paper_summary(
             content = strip_simple_markdown(content)
 
             if is_bullet:
+                # Hard cap per-paper (per-bullet) length to keep Slack blocks valid.
+                content = truncate_words_preserving_slack_links(content, max_words=100)
                 processed.append(f"• {content}")
             elif content:
                 processed.append(content)

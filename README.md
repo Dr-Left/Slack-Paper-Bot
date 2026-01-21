@@ -2,32 +2,38 @@
 
 AI-powered tool that curates personalized ML paper digests (and future podcast-style content) for researchers.
 
+### Roadmap:
+- [ ] GitHub Actions
+
+### Requirements
+
+A machine with at least 16GB RAM is enough. The machine should be up to be able to send out the messages to slack.
+With Apple Sillicon MPS or CUDA GPU is better to accelerate the embedding generation and vector similarity calculation.
+
 ### Features
 
 - **Paper fetching**: Fetch recent papers from arXiv by category (with optional affiliations).
 - **Semantic filtering**: SPECTER2-based matching against a user profile (topics, keywords, past papers).
-- **Slack digests**: Daily top papers posted to a Slack channel, with reaction-based profile updates.
+- **Slack digests**: Daily top papers posted to a Slack channel, with **reaction-based profile updates**.
 - **LLM summary**: Optional GPT-4o-powered digest summary footer for Slack.
 
 ### Install
 
 ```bash
-python -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install -e .
+uv pip install -e .
 ```
-
-Python 3.13+ is recommended.
 
 ### Configure Slack bot
 
 1. **Create Slack app**
    - Go to `https://api.slack.com/apps`
-   - Create a new app from scratch
-   - Add bot scopes: `chat:write`, `chat:write.public`, `reactions:read`
+   - Create a new app **from scratch**
+   - In  `OAuth & Permissions`, add bot scopes: `chat:write`, `chat:write.public`, `channels:history`, `groups:history`, `reactions:read`
    - Install the app and copy the **Bot User OAuth Token** (`xoxb-...`)
 2. **Find channel ID**
-   - Open channel details in Slack and copy the **Channel ID** (`C...`)
+   - Open channel details in Slack and copy the **Channel ID** (`C...`) (At the bottom of the Slack channel detail page, after you click on the channel title)
 3. **Create config**
 
 ```bash
@@ -48,9 +54,11 @@ Edit `config/config.json`:
 }
 ```
 
-### Profiles
+If you don't want to use LLM to summarize the papers, just remove `openai_api_key`.
 
-Profiles live in `profiles/*.json`. See `profiles/example_profile.json` or `profiles/efficient_ml.json`:
+### Paper Interest Profiles
+
+Paper Interest profiles live in `profiles/*.json`. See `profiles/example_profile.json` or `profiles/efficient_ml.json`:
 
 - **name**: Profile name.
 - **topics**: Free-text research interests.
@@ -63,6 +71,25 @@ Profiles live in `profiles/*.json`. See `profiles/example_profile.json` or `prof
 ### Core commands
 
 ```bash
+# **MAIN** Run Slack bot
+python -m ai_pod.slack_bot --dry-run  # test without Slack configuration
+python -m ai_pod.slack_bot  # full run
+
+# Import historic arXiv links from a channel into paper history to avoid duplications
+python -m ai_pod.slack_bot --import-from-channel --import-channel C01234ABCDE --import-days 30
+```
+
+### Scheduling (Daily Paper Digest)
+
+```bash
+crontab -e
+
+# Daily 8am digest
+0 8 * * * cd /path/to/repo && .venv/bin/python -m ai_pod.slack_bot >> logs/slack_bot.log 2>&1
+```
+
+### Other Debug Commands:
+```bash
 # Fetch papers from arXiv (shows affiliations when present)
 python -m ai_pod.get_papers -c cs.LG cs.AI -d 7 -n 20 --show-affiliations
 
@@ -72,64 +99,6 @@ python -m ai_pod.filter_papers -p profiles/example_profile.json --fetch -c cs.LG
 # Filter using an existing cached papers file
 python -m ai_pod.filter_papers -p profiles/example_profile.json --papers-cache data/papers_*.json
 
-# Run Slack bot (dry run to preview)
-python -m ai_pod.slack_bot --dry-run
-
-# Run Slack bot (post to Slack)
-python -m ai_pod.slack_bot
-
-# Allow duplicate papers in digest (useful for testing)
-python -m ai_pod.slack_bot --allow-duplication
-```
-
-### Channel import (bootstrapping)
-
-If you've been posting papers manually or want to import from an existing channel:
-
-```bash
-# Import all papers from configured channel
-python -m ai_pod.slack_bot --import-from-channel
-
-# Import from a different channel
-python -m ai_pod.slack_bot --import-from-channel --import-channel C01234ABCDE
-
-# Import only last 30 days
-python -m ai_pod.slack_bot --import-from-channel --import-days 30
-
-# Fast import without fetching metadata from arXiv
-python -m ai_pod.slack_bot --import-from-channel --import-days 30 --no-fetch-metadata
-```
-
-**How it works:**
-- Scans Slack channel messages for `arxiv.org/abs/` links
-- Extracts arXiv IDs and fetches metadata (title, abstract) from arXiv API
-- Adds papers to `data/posted_papers.json` to prevent duplicates
-- Uses fallback methods (arxiv-txt.org, HTML scraping) if API rate-limited
-- Rate-limited to 5 seconds between requests to respect arXiv's limits
-
-### LLM summaries (optional)
-
-Add your OpenAI API key to `config/config.json` to enable GPT-4o summaries:
-
-```json
-{
-  "openai_api_key": "sk-..."
-}
-```
-
-The bot will generate a digest summary footer with:
-- Bullet points for each recommended paper
-- Contrastive analysis against similar previously posted papers
-- Links to similar past papers for context
-- Slack-friendly formatting with clickable arXiv links
-
-### Scheduling (optional)
-
-```bash
-crontab -e
-
-# Daily 8am digest
-0 8 * * * cd /path/to/ai-pod && .venv/bin/python -m ai_pod.slack_bot >> logs/slack_bot.log 2>&1
 ```
 
 ### Data & caching
@@ -173,3 +142,11 @@ For large imports, consider using `--no-fetch-metadata` for a faster initial imp
 - `ai_pod.slack_utils`: Slack formatting, posting, reaction-based profile updates, channel import.
 - `ai_pod.posted_papers`: Tracking of posted papers with metadata for deduplication.
 - `ai_pod.summary`: GPT-4o-based digest summarization using OpenAI Python SDK with contrastive analysis.
+- `ai_pod.summary`: GPT-4o-based digest summarization using OpenAI Python SDK.
+
+## Acknoledgements
+
+Some insights came from [arXiv_recbot](https://github.com/yuandong-tian/arXiv_recbot/tree/main) and [ArxivDigest](https://github.com/AutoLLM/ArxivDigest).
+
+## License
+MIT License.
