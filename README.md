@@ -66,7 +66,7 @@ Paper Interest profiles live in `profiles/*.json`. See `profiles/example_profile
 - **past_papers**: Optional list of `{title, abstract, arxiv_id}`.
 - **preferred_authors**: Optional list of author names.
 
-**Reaction Learning**: Papers you react to with `:fire:` (🔥) in Slack are automatically added to your profile's `past_papers`. The bot checks for reactions before each run and updates your profile to improve future recommendations.
+**Reaction Learning**: Papers you react to with `:fire:` (🔥) in Slack are automatically added to your profile's `past_papers`. The bot checks for reactions on papers posted within the last 3 days before each run and updates your profile to improve future recommendations.
 
 ### Core commands
 
