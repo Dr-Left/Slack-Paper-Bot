@@ -33,7 +33,6 @@ class SlackConfig:
     bot_token: str
     channel_id: str
     profile_path: str
-    categories: list[str]
     days: int
     top_k: int
     openai_api_key: Optional[str] = None
@@ -71,7 +70,6 @@ def load_config(config_path: str = "config/config.json") -> SlackConfig:
         bot_token=data["bot_token"],
         channel_id=data["channel_id"],
         profile_path=data.get("profile_path", "profiles/efficient_ml.json"),
-        categories=data.get("categories", ["cs.LG", "cs.AI", "cs.CL"]),
         days=data.get("days", 1),
         top_k=data.get("top_k", 5),
         openai_api_key=data.get("openai_api_key"),
@@ -89,7 +87,6 @@ def run_bot(config_path: str = "config/config.json", dry_run: bool = False, allo
     # 1. Load config
     logger.info("Loading configuration...")
     config = load_config(config_path)
-    logger.info(f"Config: {config.categories}, last {config.days} day(s), top {config.top_k}")
 
     # 2. Fetch reactions and update profile before filtering (skip in dry run)
     if not dry_run:
@@ -102,12 +99,14 @@ def run_bot(config_path: str = "config/config.json", dry_run: bool = False, allo
     profile = load_user_profile(config.profile_path)
     logger.info(
         f"Profile '{profile.name}': {len(profile.topics)} topics, "
-        f"{len(profile.keywords)} keywords, {len(profile.past_papers)} past papers"
+        f"{len(profile.keywords)} keywords, {len(profile.past_papers)} past papers, "
+        f"{len(profile.categories)} categories"
     )
+    logger.info(f"Config: {profile.categories}, last {config.days} day(s), top {config.top_k}")
 
     # 4. Fetch papers from arXiv
-    categories = [ArxivCategory(cat) for cat in config.categories]
-    logger.info(f"Fetching papers from {config.categories} (last {config.days} day(s))...")
+    categories = [ArxivCategory(cat) for cat in profile.categories]
+    logger.info(f"Fetching papers from {profile.categories} (last {config.days} day(s))...")
     papers = get_papers(
         categories=categories,
         days=config.days,

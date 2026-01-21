@@ -23,6 +23,9 @@ class ArxivCategory(Enum):
     # Other relevant
     CS_RO = "cs.RO"      # Robotics
     CS_HC = "cs.HC"      # Human-Computer Interaction
+    CS_DC = "cs.DC"      # Distributed, Parallel, and Cluster Computing
+    CS_OS = "cs.OS"      # Operating Systems
+    CS_AR = "cs.AR"      # Hardware Architecture
 
 
 class OutputMode(Enum):
@@ -30,6 +33,15 @@ class OutputMode(Enum):
 
     TITLE_ONLY = "title_only"
     TITLE_ABSTRACT = "title_abstract"
+
+
+class MatchType(Enum):
+    """Type of match for filtered papers."""
+
+    SIMILARITY = "similarity"  # Matched by semantic similarity
+    KEYWORD = "keyword"  # Matched by keyword in title/abstract
+    AUTHOR = "author"  # Matched by followed author
+    KEYWORD_AUTHOR = "keyword_author"  # Matched by both keyword and author
 
 
 @dataclass
@@ -80,20 +92,31 @@ class UserProfile:
     """Researcher's interest profile for paper filtering."""
 
     topics: list[str]  # Natural language topic descriptions
-    keywords: list[str]  # Specific keywords to boost
+    keywords: list[str]  # Specific keywords to match (hard matching in title/abstract)
     past_papers: list[PastPaper]  # Papers user found interesting
-    preferred_authors: Optional[list[str]] = None  # Optional author preferences
+    categories: list[str]  # arXiv categories to fetch (e.g., cs.LG, cs.AI)
+    followed_authors: Optional[list[str]] = None  # Authors to follow (hard matching)
     name: str = "default"  # Profile identifier
 
 
 @dataclass
 class FilteredPaper:
-    """Paper with its similarity score."""
+    """Paper with its similarity score and match information."""
 
     paper: Paper
     similarity_score: float
+    match_type: MatchType = MatchType.SIMILARITY
+    matched_keywords: Optional[list[str]] = None
+    matched_authors: Optional[list[str]] = None
 
     def __str__(self) -> str:
-        return f"[{self.similarity_score:.3f}] {self.paper}"
+        if self.match_type == MatchType.SIMILARITY:
+            return f"[{self.similarity_score:.3f}] {self.paper}"
+        elif self.match_type == MatchType.KEYWORD:
+            return f"[KEYWORD] {self.paper}"
+        elif self.match_type == MatchType.AUTHOR:
+            return f"[AUTHOR] {self.paper}"
+        else:  # KEYWORD_AUTHOR
+            return f"[KW+AUTH] {self.paper}"
 
 

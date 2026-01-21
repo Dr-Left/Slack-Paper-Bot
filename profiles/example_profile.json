@@ -1,5 +1,10 @@
 {
   "name": "ml_researcher",
+  "categories": [
+    "cs.LG",
+    "cs.AI",
+    "cs.CL"
+  ],
   "topics": [
     "large language models and their applications",
     "efficient training methods for transformers",
@@ -23,5 +28,5 @@
       "abstract": "Recent work has demonstrated substantial gains on many NLP tasks and benchmarks by pre-training on a large corpus of text followed by fine-tuning on a specific task. We demonstrate that scaling up language models greatly improves task-agnostic, few-shot performance, sometimes even reaching competitiveness with prior state-of-the-art fine-tuning approaches."
     }
   ],
-  "preferred_authors": ["Song Han"]
+  "followed_authors": ["Song Han"]
 }

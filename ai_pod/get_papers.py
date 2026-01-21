@@ -19,7 +19,7 @@ from ai_pod.utils.cache_utils import (
 
 ARXIV_API_URL = "http://export.arxiv.org/api/query"
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
-ARXIV_PAGE_SIZE = 2000  # max per request
+ARXIV_PAGE_SIZE = 256  # don't set too large.
 # atom is for xml parsing
 
 

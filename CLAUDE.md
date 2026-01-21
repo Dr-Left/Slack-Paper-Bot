@@ -103,13 +103,37 @@ ai-pod/
 - `UserProfile`: researcher interests (topics, keywords, past papers)
 - `FilteredPaper`: paper with similarity score
 
-### Slack Bot (`slack_bot.py`)
+### Slack Bot (`slack_bot.py`, `slack_utils.py`, `posted_papers.py`, `summary.py`)
+**Main Bot (`slack_bot.py`)**:
 - Posts daily paper digests to Slack channel
 - Uses `filter_papers.py` for semantic matching against user profile
 - Tracks posted papers in `data/posted_papers.json` for deduplication
 - Configurable via `config/config.json` (bot token, channel, categories, etc.)
-- CLI: `python -m ai_pod.slack_bot --help`
-- Requires Slack App with `chat:write` and `chat:write.public` scopes
+- Requires Slack App with `chat:write`, `chat:write.public`, and `reactions:read` scopes
+
+**Slack Utilities (`slack_utils.py`)**:
+- Formatting functions for Slack blocks and messages
+- `post_to_slack()` - Posts papers as separate messages
+- `fetch_reactions_and_update_profile()` - Reads 🔥 reactions and adds papers to profile
+- `import_papers_from_channel()` - Scans channel history for arXiv papers
+- Multi-layer fallback for metadata fetching (API → arxiv-txt.org → HTML scraping)
+
+**Posted Papers Tracking (`posted_papers.py`)**:
+- `load_posted_papers()` - Loads tracking data with backward compatibility
+- `save_posted_papers()` - Saves with full metadata (arxiv_id, message_ts, title, abstract)
+- `filter_already_posted()` - Removes duplicates before posting
+
+**Summary Generation (`summary.py`)**:
+- `generate_paper_summary()` - OpenAI GPT-4o summaries of daily digest
+- `find_similar_past_paper()` - Uses SPECTER2 to find similar previously posted papers
+- Generates contrastive summaries highlighting differences from past papers
+
+**Key Features**:
+- **Channel Import**: Bootstrap from existing channel history (`--import-from-channel`)
+- **Reaction Learning**: React with 🔥 to papers you like, automatically added to profile
+- **Rate Limiting**: Exponential backoff and fallback sources for arXiv API
+- **Deduplication**: Prevents reposting papers across bot runs
+- **LLM Summaries**: Optional GPT-4o summaries with contrastive analysis
 
 ## Architecture Notes
 

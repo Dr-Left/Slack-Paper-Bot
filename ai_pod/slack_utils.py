@@ -10,11 +10,30 @@ from typing import TYPE_CHECKING, Optional
 from loguru import logger
 
 from ai_pod.filter_papers import load_user_profile, save_user_profile
-from ai_pod.models import FilteredPaper, PastPaper
+from ai_pod.models import FilteredPaper, MatchType, PastPaper
 from ai_pod.posted_papers import load_posted_papers, save_posted_papers
 
 if TYPE_CHECKING:
     from ai_pod.slack_bot import SlackConfig
+
+
+def _format_match_label(paper: FilteredPaper) -> str:
+    """Format the match type label for display.
+
+    Args:
+        paper: FilteredPaper object.
+
+    Returns:
+        Match label string like "[KEYWORD]", "[AUTHOR]", "[KW+AUTH]", or "[0.XX]".
+    """
+    if paper.match_type == MatchType.KEYWORD_AUTHOR:
+        return "[KW+AUTH]"
+    elif paper.match_type == MatchType.KEYWORD:
+        return "[KEYWORD]"
+    elif paper.match_type == MatchType.AUTHOR:
+        return "[AUTHOR]"
+    else:  # SIMILARITY
+        return f"[{paper.similarity_score:.2f}]"
 
 
 def format_paper_message(paper: FilteredPaper, index: int) -> str:
@@ -36,7 +55,8 @@ def format_paper_message(paper: FilteredPaper, index: int) -> str:
     if len(p.authors) > 3:
         authors_str += " et al."
 
-    return f"*{index}. [{paper.similarity_score:.2f}]* <{arxiv_url}|{p.title}>\n   by {authors_str}"
+    match_label = _format_match_label(paper)
+    return f"*{index}. {match_label}* <{arxiv_url}|{p.title}>\n   by {authors_str}"
 
 
 def format_header_blocks(num_papers: int) -> list[dict]:
@@ -91,12 +111,13 @@ def format_single_paper_blocks(paper: FilteredPaper, index: int) -> list[dict]:
     if len(p.authors) > 3:
         authors_str += " et al."
 
+    match_label = _format_match_label(paper)
     blocks = [
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*{index}. [{paper.similarity_score:.2f}]* <{arxiv_url}|{p.title}>\nby {authors_str}",
+                "text": f"*{index}. {match_label}* <{arxiv_url}|{p.title}>\nby {authors_str}",
             },
         },
     ]
@@ -209,29 +230,38 @@ def post_summary_footer(config: SlackConfig, summary: str) -> bool:
 def fetch_reactions_and_update_profile(
     config: SlackConfig,
     reaction_emoji: str = "fire",
+    days_back: int = 3,
 ) -> int:
     """Fetch reactions from posted papers and add liked papers to profile.
 
     Args:
         config: Slack configuration.
         reaction_emoji: The emoji reaction to look for (default: "fire" for fire emoji).
+        days_back: Only check reactions on papers posted within this many days (default: 3).
 
     Returns:
         Number of papers added to the profile.
     """
+    import time
     from slack_sdk import WebClient
     from slack_sdk.errors import SlackApiError
 
     posted_papers = load_posted_papers()
 
-    # Filter to papers that have message_ts (can check reactions)
-    papers_with_ts = [p for p in posted_papers if p.get("message_ts")]
+    # Calculate cutoff timestamp (days_back days ago)
+    cutoff_ts = time.time() - (days_back * 24 * 60 * 60)
+
+    # Filter to papers that have message_ts and are within the time window
+    papers_with_ts = [
+        p for p in posted_papers
+        if p.get("message_ts") and float(p["message_ts"].split(".")[0]) >= cutoff_ts
+    ]
 
     if not papers_with_ts:
-        logger.debug("No posted papers with message_ts to check for reactions")
+        logger.debug(f"No posted papers within the last {days_back} days to check for reactions")
         return 0
 
-    logger.info(f"Checking reactions on {len(papers_with_ts)} posted papers...")
+    logger.info(f"Checking reactions on {len(papers_with_ts)} papers posted in the last {days_back} days...")
 
     client = WebClient(token=config.bot_token)
 
